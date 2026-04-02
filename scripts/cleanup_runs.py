@@ -63,8 +63,12 @@ def cleanup_runs(root: Path, max_age_minutes: float, dry_run: bool = False) -> t
         except PermissionError:
             print(f"[WARN] Permission denied: {file_path}")
 
-    # Remove empty directories bottom-up (excluding root)
+    # Remove empty subdirectories bottom-up (excluding root and outputs/)
+    preserve_dirs = {root, root / "outputs"}
     for dir_path in sorted((p for p in root.rglob("*") if p.is_dir()), key=lambda p: len(p.parts), reverse=True):
+        # Skip preserving root structure
+        if dir_path in preserve_dirs or dir_path.parent in preserve_dirs:
+            continue
         try:
             if any(dir_path.iterdir()):
                 continue

@@ -22,6 +22,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY app.py /app/app.py
+COPY scripts /app/scripts
 
 # Create output directory
 RUN mkdir -p /app/runs/outputs

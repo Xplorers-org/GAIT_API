@@ -17,7 +17,7 @@ import base64
 import io
 
 app = FastAPI(
-    title="HEMAS NeuroTrack Gait Analysis API",
+    title="Gait Analysis API",
     description="Clinical gait analysis using MediaPipe Pose estimation",
     version="1.0.0"
 )

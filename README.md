@@ -20,7 +20,15 @@ Open Swagger UI:
 - `POST /analyze`
   - form-data:
     - `video`: video file (front-view gait)
-    - `patient_gender`: `male` or `female`
+    - `gender`: `male` or `female`
+
+- `POST /analyze_files`
+  - form-data:
+    - `video`: video file
+    - `gender`: `male` or `female`
+
+- `GET /download/{filename}`
+- `GET /health`
 
 Response includes:
 
@@ -57,3 +65,35 @@ Behavior:
 ```
 
 Replace `gait-api` with your running container name.
+
+## Hugging Face Spaces (Docker) deployment
+
+This repository is ready for Docker Spaces deployment. The container now:
+
+- listens on `PORT` (default `7860`) required by Spaces
+- starts a background cleanup loop for `/app/runs`
+- launches the API via `scripts/start.sh`
+
+Environment variables (optional):
+
+- `PORT` (default: `7860`)
+- `CLEANUP_INTERVAL_SECONDS` (default: `1800`)
+- `RUNS_MAX_AGE_MINUTES` (default: `30`)
+
+## GitHub Actions auto-deploy to your HF Space
+
+Workflow file:
+
+- `.github/workflows/deploy-hf-space.yml`
+
+Target Space:
+
+- `xplorers/GAIT_API`
+
+### Required GitHub secret
+
+Add this repository secret in GitHub:
+
+- `HF_TOKEN` = a Hugging Face User Access Token with write permission to `xplorers/GAIT_API`
+
+On every push to `main`, GitHub Actions force-pushes this repo to your Space.

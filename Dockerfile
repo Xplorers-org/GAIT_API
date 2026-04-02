@@ -25,10 +25,10 @@ COPY app.py /app/app.py
 COPY scripts /app/scripts
 
 # Create output directory
-RUN mkdir -p /app/runs/outputs
+RUN mkdir -p /app/runs/outputs && chmod +x /app/scripts/start.sh
 
 # Expose port
-EXPOSE 8000
+EXPOSE 7860
 
 # Run the application
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/scripts/start.sh"]

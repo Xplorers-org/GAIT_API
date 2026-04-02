@@ -1,0 +1,33 @@
+name: Deploy to Hugging Face Space
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -z "${HF_TOKEN}" ]; then
+            echo "HF_TOKEN secret is missing"
+            exit 1
+          fi
+
+          git remote add hf "https://oauth2:${HF_TOKEN}@huggingface.co/spaces/xplorers/GAIT_API"
+          git push --force hf HEAD:main

@@ -1,4 +1,14 @@
-# HEMAS NeuroTrack FastAPI
+---
+title: GAIT_API
+emoji: 🚶
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_file: app.py
+pinned: false
+---
+
+# Gait Analysis API
 
 This project ports the complete notebook logic from `gait2 (5).ipynb` into a FastAPI app with Swagger UI.
 
@@ -16,11 +26,6 @@ Open Swagger UI:
 - http://127.0.0.1:8000/docs
 
 ## Endpoint
-
-- `POST /analyze`
-  - form-data:
-    - `video`: video file (front-view gait)
-    - `gender`: `male` or `female`
 
 - `POST /analyze_files`
   - form-data:

@@ -34,7 +34,5 @@ jobs:
           fi
 
           git remote remove hf 2>/dev/null || true
-          git remote add hf "https://huggingface.co/spaces/xplorers/GAIT_API"
-
-          git -c http.extraheader="Authorization: Bearer ${HF_TOKEN_CLEAN}" \
-            push --force hf HEAD:main
+          git remote add hf "https://user:${HF_TOKEN_CLEAN}@huggingface.co/spaces/xplorers/GAIT_API"
+          git push --force hf HEAD:main

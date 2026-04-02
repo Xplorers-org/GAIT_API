@@ -24,10 +24,17 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          if [ -z "${HF_TOKEN}" ]; then
-            echo "HF_TOKEN secret is missing"
+          set -euo pipefail
+
+          HF_TOKEN_CLEAN="$(printf '%s' "${HF_TOKEN}" | tr -d '\r\n' | xargs)"
+
+          if [ -z "${HF_TOKEN_CLEAN}" ]; then
+            echo "HF_TOKEN secret is missing/empty after trimming"
             exit 1
           fi
 
-          git remote add hf "https://oauth2:${HF_TOKEN}@huggingface.co/spaces/xplorers/GAIT_API"
-          git push --force hf HEAD:main
+          git remote remove hf 2>/dev/null || true
+          git remote add hf "https://huggingface.co/spaces/xplorers/GAIT_API"
+
+          git -c http.extraheader="Authorization: Bearer ${HF_TOKEN_CLEAN}" \
+            push --force hf HEAD:main

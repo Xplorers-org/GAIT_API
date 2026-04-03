@@ -10,95 +10,201 @@ pinned: false
 
 # Gait Analysis API
 
-This project ports the complete notebook logic from `gait2 (5).ipynb` into a FastAPI app with Swagger UI.
+Clinical gait analysis service built with FastAPI, OpenCV, and MediaPipe Pose.
 
-## Run
+It processes a front-view walking video and returns:
+
+- extracted gait biomarkers
+- rule-based clinical interpretation
+- overall gait stability score
+- annotated skeleton video
+- clinical dashboard plot
+
+The notebook prototype is kept in [gait.ipynb](<gait.ipynb>), and the production API implementation is in [app.py](app.py).
+
+## Table of contents
+
+- Overview
+- Project structure
+- How it works
+- API reference
+- Local development
+- Docker usage
+- Storage cleanup strategy
+- Hugging Face Spaces deployment
+- GitHub Actions auto-deploy
+- Troubleshooting
+
+## Overview
+
+This API is designed for single-video gait assessment.
+
+Core stack:
+
+- FastAPI for REST endpoints
+- MediaPipe Pose for landmark extraction
+- OpenCV for video I/O and skeleton overlay
+- NumPy/SciPy for signal processing and feature extraction
+- Matplotlib for biomarker visualizations
+
+Dependencies are listed in [requirements.txt](requirements.txt).
+
+## Project structure
+
+- [app.py](app.py): Main API + gait analysis pipeline
+- [requirements.txt](requirements.txt): Python dependencies
+- [Dockerfile](Dockerfile): Container build (HF Spaces compatible)
+- [scripts/start.sh](scripts/start.sh): Container startup + background cleanup loop
+- [scripts/cleanup_runs.py](scripts/cleanup_runs.py): Deletes old generated files
+- [.github/workflows/deploy-hf-space.yml](.github/workflows/deploy-hf-space.yml): Auto-sync GitHub repo to HF Space
+- [gait.ipynb](<gait.ipynb>): Original notebook source logic
+
+## How it works
+
+High-level flow:
+
+1. Upload `video` + `gender`
+2. Extract pose landmarks for each frame
+3. Validate video (person detected, front-view check)
+4. Build temporal signals (ankles, feet, arm swing, hip center)
+5. Smooth + detrend + detect peaks
+6. Compute biomarkers (`stride_variability`, `cadence`, `symmetry_ratio`, arm metrics)
+7. Create clinical interpretation text
+8. Compute weighted gait stability score
+9. Generate dashboard image + annotated video
+10. Return JSON payload
+
+Main endpoints are declared in [app.py](app.py#L560-L785).
+
+## API reference
+
+### `GET /`
+
+Basic API metadata and endpoint hints.
+
+### `POST /analyze`
+
+Accepts multipart form-data:
+
+- `video`: gait video (`mp4/mov/avi/...`)
+- `gender`: `male` or `female`
+
+Returns analysis JSON with base64-embedded files (`annotated_video`, `clinical_dashboard`).
+
+Use this when you want everything in one response.
+
+### `POST /analyze_files`
+
+Accepts multipart form-data:
+
+- `video`: gait video
+- `gender`: `male` or `female`
+
+Returns analysis JSON with downloadable URLs:
+
+- `/download/{session_id}_annotated.mp4`
+- `/download/{session_id}_dashboard.png`
+
+This is generally the better choice for deployment because responses stay smaller than full base64 payloads.
+
+### `GET /download/{filename}`
+
+Downloads generated output files from `runs/outputs`.
+
+### `GET /health`
+
+Simple health check.
+
+
+## Local development
+
+1. Create environment and install dependencies
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app:app --reload
 ```
 
-Open Swagger UI:
+2. Run API
 
-- http://127.0.0.1:8000/docs
+```bash
+uvicorn app:app --reload --host 0.0.0.0 --port 8000
+```
 
-## Endpoint
+3. Open docs
 
-- `POST /analyze_files`
-  - form-data:
-    - `video`: video file
-    - `gender`: `male` or `female`
+- Swagger UI: http://127.0.0.1:8000/docs
+- ReDoc: http://127.0.0.1:8000/redoc
 
-- `GET /download/{filename}`
-- `GET /health`
+## Docker usage
 
-Response includes:
+Build:
 
-- clinical interpretation text (same wording/thresholds as notebook)
-- gait score and interpretation
-- full feature values
-- URL to annotated output video
-- URL to biomarker plot image
+```bash
+docker build -t gait-api:latest .
+```
 
-## Automatic cleanup for runs/
+Run:
+
+```bash
+docker run --rm -p 7860:7860 gait-api:latest
+```
+
+Container defaults:
+
+- serves on port `7860`
+- startup script: [scripts/start.sh](scripts/start.sh)
+- output directory: `/app/runs/outputs`
+
+## Storage cleanup strategy
 
 Generated files from `/analyze_files` are stored under `runs/outputs`.
-To prevent storage growth, use the cleanup script every 30 minutes.
 
-Script path:
+Cleanup is handled by [scripts/cleanup_runs.py](scripts/cleanup_runs.py):
 
-- `scripts/cleanup_runs.py`
+- default retention: 30 minutes
+- deletes old files under `runs/`
+- preserves required directory structure
 
-Behavior:
+In Docker/HF Spaces, [scripts/start.sh](scripts/start.sh) starts a background cleanup loop automatically.
 
-- Deletes files older than 30 minutes (default)
-- Removes empty subdirectories
+Configurable environment variables:
 
-### Local host cron example
-
-```bash
-*/30 * * * * /usr/bin/python3 /path/to/GAIT_API/scripts/cleanup_runs.py --path /path/to/GAIT_API/runs --max-age-minutes 30 >> /var/log/gait_cleanup.log 2>&1
-```
-
-### Docker container cron example (host cron running docker exec)
-
-```bash
-*/30 * * * * docker exec gait-api python /app/scripts/cleanup_runs.py --path /app/runs --max-age-minutes 30 >> /var/log/gait_cleanup.log 2>&1
-```
-
-Replace `gait-api` with your running container name.
-
-## Hugging Face Spaces (Docker) deployment
-
-This repository is ready for Docker Spaces deployment. The container now:
-
-- listens on `PORT` (default `7860`) required by Spaces
-- starts a background cleanup loop for `/app/runs`
-- launches the API via `scripts/start.sh`
-
-Environment variables (optional):
-
-- `PORT` (default: `7860`)
 - `CLEANUP_INTERVAL_SECONDS` (default: `1800`)
 - `RUNS_MAX_AGE_MINUTES` (default: `30`)
 
-## GitHub Actions auto-deploy to your HF Space
+Optional manual run:
 
-Workflow file:
+```bash
+python scripts/cleanup_runs.py --path ./runs --max-age-minutes 30 --dry-run
+```
 
-- `.github/workflows/deploy-hf-space.yml`
+## Hugging Face Spaces deployment (Docker)
 
-Target Space:
+This repository is configured for Docker Spaces.
 
-- `xplorers/GAIT_API`
+Key points:
 
-### Required GitHub secret
+- README front matter is required and already included
+- container uses [Dockerfile](Dockerfile)
+- app starts via [scripts/start.sh](scripts/start.sh)
+- `PORT` env is respected (default `7860`)
 
-Add this repository secret in GitHub:
+Recommended endpoint on Spaces:
 
-- `HF_TOKEN` = a Hugging Face User Access Token with write permission to `xplorers/GAIT_API`
+- Use `/analyze_files` for better response size and reliability
 
-On every push to `main`, GitHub Actions force-pushes this repo to your Space.
+## GitHub Actions auto-deploy to HF Space
+
+Workflow: [.github/workflows/deploy-hf-space.yml](.github/workflows/deploy-hf-space.yml)
+
+Behavior:
+
+- triggers on push to `main`
+- sanitizes `HF_TOKEN`
+- force-pushes repository to `xplorers/GAIT_API`
+
+Required GitHub secret:
+
+- `HF_TOKEN`: Hugging Face token with write access to the target Space
